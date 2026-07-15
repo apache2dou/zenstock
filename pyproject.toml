@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zenstock"
+version = "0.1.0"
+description = "A股量化策略研究与回测框架"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "ZenStock Contributors"}]
+keywords = ["quant", "finance", "backtest", "a-share", "china-stock"]
+
+dependencies = [
+    # 数据采集
+    "akshare>=1.12.0",
+    "baostock>=0.8.9",
+    # 数据处理
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "python-dateutil",
+    # 存储
+    "duckdb>=0.10.0",
+    "pyarrow>=14.0",       # Parquet 支持
+    # 配置 & 日志
+    "PyYAML>=6.0",
+    "loguru>=0.7",
+    # 终端输出
+    "tqdm>=4.65",
+    "rich>=13.0",
+    # 技术指标
+    "pandas-ta>=0.3.14b",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff>=0.1",
+    "black",
+    "mypy",
+    "pre-commit",
+]
+viz = [
+    "streamlit>=1.30",
+    "plotly>=5.18",
+    "matplotlib>=3.7",
+]
+tushare = [
+    "tushare>=1.4.0",
+]
+talib = [
+    # TA-Lib 需要 C 库，见 https://github.com/TA-Lib/ta-lib-python
+    "TA-Lib",
+]
+all = [
+    "zenstock[viz,tushare]",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourname/zenstock"
+Repository = "https://github.com/yourname/zenstock"
+
+# --- setuptools 配置 ---
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+zenstock = ["py.typed"]
+
+# --- 开发工具配置 ---
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+
+# --- CLI 入口点（可选）---
+[project.scripts]
+zenstock-download = "zenstock.cli:main"

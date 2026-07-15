@@ -1,0 +1,78 @@
+# ZenStock 全局配置
+# ============================================
+
+# 数据层配置
+data:
+  # 数据源：akshare | baostock | tushare
+  # 注意：akshare 走东方财富接口，国内部分网络可能被限流；
+  #       baostock 自有服务器，连接更稳定，推荐默认使用。
+  source: baostock
+
+  # 存储引擎：duckdb | parquet | sqlite
+  storage: duckdb
+
+  # 本地数据根目录（相对于项目根）
+  data_dir: data
+
+  # 复权方式：qfq(前复权) | hfq(后复权) | none(不复权)
+  adjust: qfq
+
+  # 默认 K 线周期：D(日) | 5(5分钟) | 15 | 30 | 60
+  default_freq: D
+
+  # 增量更新：仅拉取上次更新之后的新数据
+  incremental: true
+
+  # 请求间隔（秒），避免被限流
+  request_sleep: 0.3
+
+  # 重试次数
+  max_retries: 3
+
+
+# 回测配置
+backtest:
+  # 初始资金（元）
+  initial_capital: 100000.0
+
+  # 佣金费率（双边）：万 2.5
+  commission: 0.00025
+
+  # 印花税（仅卖出）：千 1
+  stamp_duty: 0.001
+
+  # 过户费（沪市双边）：万 0.1
+  transfer_fee: 0.00001
+
+  # 最低佣金（元）
+  min_commission: 5.0
+
+  # 滑点：0.1%
+  slippage: 0.001
+
+  # T+1 交易限制
+  t_plus_1: true
+
+  # 涨跌停限制（%）：主板 10，创业板/科创板 20
+  price_limit_pct: 10.0
+
+  # 无风险利率（用于夏普比率计算）
+  risk_free_rate: 0.025
+
+  # 基准指数：用于对比
+  benchmark: "000300"
+
+
+# 日志配置
+logging:
+  level: INFO          # DEBUG | INFO | WARNING | ERROR
+  log_dir: logs
+  rotation: 10 MB
+  retention: 30 days
+  console: true
+
+
+# Tushare（可选）
+tushare:
+  token: ""            # 在 https://tushare.pro 注册获取
+  # 使用积分制，免费账户有调用频率限制
