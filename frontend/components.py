@@ -44,6 +44,13 @@ STRATEGY_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "基于 czsc 库的缠论一买/二买/三买信号（计算成本较高）",
         "minute_friendly": False,
     },
+    "bi_state": {
+        "module": "strategies.bi_state_strategy",
+        "class": "BiStateStrategy",
+        "label": "🔬 两重表里关系",
+        "desc": "缠论第91-92课：笔状态机+概率统计+MA趋势过滤+MACD背驰+止损止盈",
+        "minute_friendly": False,
+    },
 }
 
 # 各策略的参数滑块定义: param_key → (label, min, max, default, step)
@@ -72,6 +79,15 @@ PARAM_DEFS: dict[str, dict[str, tuple[str, int | float, int | float, int | float
         "stop_loss_pct": ("止损(%)", 2.0, 20.0, 5.0, 0.5),
         "take_profit_pct": ("止盈(%)", 5.0, 50.0, 15.0, 1.0),
         "max_hold_bars": ("最大持仓K线(0=不限)", 0, 500, 0, 10),
+    },
+    "bi_state": {
+        "warmup_bars": ("预热期(K线)", 30, 250, 80, 10),
+        "buy_threshold": ("买入概率阈值", 0.5, 0.9, 0.6, 0.05),
+        "sell_threshold": ("卖出概率阈值", 0.5, 0.9, 0.6, 0.05),
+        "ma_trend": ("趋势均线周期", 20, 120, 60, 5),
+        "stop_loss_pct": ("止损(%)", 2.0, 15.0, 5.0, 0.5),
+        "take_profit_pct": ("止盈(%)", 5.0, 50.0, 15.0, 1.0),
+        "cooldown_bars": ("冷却期(K线)", 0, 20, 5, 1),
     },
 }
 

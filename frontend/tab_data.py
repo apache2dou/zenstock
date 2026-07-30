@@ -29,7 +29,7 @@ def render() -> None:
                 "代码": ", ".join(labels) + (" ..." if len(syms) > 10 else ""),
             })
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     else:
         st.info("暂无任何本地数据")
 
@@ -268,10 +268,22 @@ def _do_incremental_update(
             results.append(f"⏭️ {label}：本地无数据，跳过")
         else:
             last_dt = pd.Timestamp(last_date)
-            start_dt = last_dt.normalize() + timedelta(days=1)
-            start_str = start_dt.strftime("%Y-%m-%d")
+            freq_enum = Freq(freq) if isinstance(freq, str) else freq
 
-            if start_dt > today_dt:
+            if freq_enum.is_minute:
+                # 分钟线：如果 last_date 是今天，重新下载今天的数据
+                # （盘中更新可能只有部分 K 线，收盘后需要补全）
+                if last_dt.date() >= today_dt.date():
+                    start_str = last_dt.strftime("%Y-%m-%d")
+                else:
+                    start_str = (last_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+            else:
+                # 日线/周线/月线：从下一天开始
+                start_dt = last_dt.normalize() + timedelta(days=1)
+                start_str = start_dt.strftime("%Y-%m-%d")
+
+            # 判断是否需要更新（start_str <= today 才需要）
+            if start_str > today:
                 skipped += 1
                 results.append(f"⏭️ {label}：已是最新（{str(last_date)[:10]}）")
             else:

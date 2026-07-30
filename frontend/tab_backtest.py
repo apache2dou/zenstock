@@ -30,7 +30,7 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
     with col_run:
         st.write("")  # 占位对齐
         st.write("")
-        run_btn = st.button("🚀 运行回测", type="primary", use_container_width=True)
+        run_btn = st.button("🚀 运行回测", type="primary", width="stretch")
 
     params = render_param_sliders(strategy_name, key_prefix="bt")
 
@@ -75,7 +75,7 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
     with left:
         st.subheader("💰 资金曲线")
         eq = result.equity_curve.set_index("date")
-        st.line_chart(eq[["total_equity", "market_value"]], use_container_width=True)
+        st.line_chart(eq[["total_equity", "market_value"]], width="stretch")
 
     with right:
         st.subheader("📋 交易明细")
@@ -94,7 +94,7 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
                     for t in result.trades
                 ]
             )
-            st.dataframe(trades_df, use_container_width=True, hide_index=True)
+            st.dataframe(trades_df, width="stretch", hide_index=True)
         else:
             st.warning("无交易记录")
 

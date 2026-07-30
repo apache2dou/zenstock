@@ -74,6 +74,8 @@ def load_data(symbol: str, freq: str, start: str, end: str) -> pd.DataFrame:
     df = storage.read_klines(symbol, freq_enum, start, end)
 
     if not df.empty:
+        # read_klines 返回的 Parquet 不包含频率元数据，补回给策略使用。
+        df.attrs["freq"] = freq_enum.value
         return df
 
     # 尝试从更细粒度重采样
@@ -96,7 +98,9 @@ def load_data(symbol: str, freq: str, start: str, end: str) -> pd.DataFrame:
         src_df = storage.read_klines(symbol, src_freq, start, end)
         if not src_df.empty and len(src_df) >= 10:
             st.info(f"💡 {freq_enum.display_name}无原始数据，从{src_freq.display_name}合成（缓存中）")
-            return get_or_resample(symbol, src_df, freq_enum)
+            result = get_or_resample(symbol, src_df, freq_enum)
+            result.attrs["freq"] = freq_enum.value
+            return result
 
     return pd.DataFrame()
 
@@ -167,11 +171,12 @@ def main() -> None:
             st.warning("⚠️ 1 分钟数据仅最近 5~9 个交易日，适合日内策略验证")
 
     # ===== 主区域 Tabs =====
-    tab_bt, tab_opt, tab_cmp, tab_cl, tab_data = st.tabs([
+    tab_bt, tab_opt, tab_cmp, tab_cl, tab_bs, tab_data = st.tabs([
         "🎯 单标的回测",
         "🔍 参数寻优",
         "📊 多股票对比",
         "🔮 缠论分析",
+        "🔬 两重表里关系",
         "📂 数据管理",
     ])
 
@@ -202,6 +207,13 @@ def main() -> None:
         else:
             from frontend import tab_chanlun
             tab_chanlun.render(data, symbol, freq)
+
+    with tab_bs:
+        if data.empty:
+            st.warning(f"无 {symbol} 的 {freq.display_name} 数据")
+        else:
+            from frontend import tab_bi_state
+            tab_bi_state.render(data, symbol, freq)
 
     with tab_data:
         from frontend import tab_data

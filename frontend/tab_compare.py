@@ -108,7 +108,7 @@ def render(all_symbols: list[str], freq_value: str, start, end) -> None:
     # 数值格式化
     for c in ["胜率%", "赔率", "总收益%", "年化%", "回撤%", "夏普"]:
         display[c] = display[c].map(lambda v: f"{v:.2f}")
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(display, width="stretch", hide_index=True)
 
     # ===== 收益曲线对比 =====
     st.subheader("📈 累计收益对比（%）")
@@ -118,7 +118,7 @@ def render(all_symbols: list[str], freq_value: str, start, end) -> None:
         title="累计收益率对比", labels={"value": "累计收益%", "date": "日期"},
     )
     fig.update_layout(height=450, hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ===== 雷达图对比（前 4 名）=====
     st.subheader("🕸️ 雷达图对比（前 4 名）")
@@ -139,7 +139,7 @@ def render(all_symbols: list[str], freq_value: str, start, end) -> None:
             color_discrete_map={True: "#2ecc71", False: "#e74c3c"},
         )
         fig_bar.update_layout(height=350, showlegend=False)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width="stretch")
 
     with right:
         st.markdown("**夏普比率**")
@@ -150,7 +150,7 @@ def render(all_symbols: list[str], freq_value: str, start, end) -> None:
             color_discrete_map={True: "#2ecc71", False: "#e74c3c"},
         )
         fig_bar2.update_layout(height=350, showlegend=False)
-        st.plotly_chart(fig_bar2, use_container_width=True)
+        st.plotly_chart(fig_bar2, width="stretch")
 
 
 def _render_simple_params(strategy_name: str, key_prefix: str = "") -> dict:
@@ -196,4 +196,4 @@ def _render_radar(summary: pd.DataFrame) -> None:
         title="策略表现雷达图",
     )
     fig.update_layout(height=450)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")

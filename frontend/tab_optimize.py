@@ -52,7 +52,11 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
     defaults = DEFAULT_GRIDS.get(strategy_name, {})
     param_defs = PARAM_DEFS.get(strategy_name, {})
 
-    cols = st.columns(len(defaults))
+    if not defaults:
+        st.info(f"策略 '{strategy_name}' 暂不支持参数寻优")
+        return
+
+    cols = st.columns(max(len(defaults), 1))
     grid: dict[str, list] = {}
     for idx, (key, vals) in enumerate(defaults.items()):
         label = param_defs.get(key, (key,))[0] if key in param_defs else key
@@ -126,7 +130,7 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
         "total_trades": "交易数",
     }
     top_df = top_df.rename(columns={k: v for k, v in rename.items() if k in top_df.columns})
-    st.dataframe(top_df, use_container_width=True, hide_index=True)
+    st.dataframe(top_df, width="stretch", hide_index=True)
 
     # ===== 热力图（仅当 2 个参数时）=====
     if len(keys) == 2:
@@ -154,7 +158,7 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
             aspect="auto",
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ===== 3D 曲面图 =====
     if len(keys) == 2:
@@ -173,12 +177,12 @@ def render(data: pd.DataFrame, symbol: str, freq: Freq) -> None:
                 ),
                 height=500,
             )
-            st.plotly_chart(fig3d, use_container_width=True)
+            st.plotly_chart(fig3d, width="stretch")
 
     # ===== 完整结果下载 =====
     st.divider()
     st.subheader("💾 完整结果")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
     csv = df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
         "📥 下载 CSV",

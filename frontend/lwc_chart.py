@@ -1,6 +1,6 @@
 """专业行情图表组件（基于 lightweight-charts JS / TradingView 内核）。
 
-通过 st.components.v1.html 嵌入，提供真正的行情软件级交互：
+通过 st.html 嵌入，提供真正的行情软件级交互：
 - 鼠标滚轮直接缩放（无需切换模式）
 - 拖拽平移（按住鼠标拖动）
 - 十字光标自动跟随
@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
-import streamlit.components.v1 as components
+import streamlit as st
 
 # lightweight-charts JS CDN（TradingView 开源版）
 # 必须用 v4.x（v5 API 不兼容：v5 用 addSeries(CandlestickSeries) 而非 addCandlestickSeries）
@@ -116,7 +116,7 @@ def render_kline_chart(
         show_volume=show_volume,
     )
 
-    components.html(html, height=actual_height + 40, scrolling=False)
+    st.html(html, unsafe_allow_javascript=True)
 
 
 def _build_bi_series(bi_list, up_list, down_list):
@@ -357,53 +357,55 @@ def _build_html(
     <div id="title">{title or symbol}</div>
     <div id="chart"></div>
 </div>
-<script src="{_LWC_JS}"></script>
 <script>
-var candles = {candles_json};
-var volumeData = {volumes_json};
-var MA5_data = (function(){{var d={ma_json};return d["MA5"]||[];}})();
-var MA10_data = (function(){{var d={ma_json};return d["MA10"]||[];}})();
-var MA20_data = (function(){{var d={ma_json};return d["MA20"]||[];}})();
-var bi_up_data = {bi_up_json};
-var bi_down_data = {bi_down_json};
-var seg_up_data = {seg_up_json};
-var seg_down_data = {seg_down_json};
-var zs_markers = {zs_json};
+// 动态加载 lightweight-charts 库，确保加载完成后再初始化图表
+(function() {{
+    var dataVars = function() {{
+        var candles = {candles_json};
+        var volumeData = {volumes_json};
+        var MA5_data = (function(){{var d={ma_json};return d["MA5"]||[];}})();
+        var MA10_data = (function(){{var d={ma_json};return d["MA10"]||[];}})();
+        var MA20_data = (function(){{var d={ma_json};return d["MA20"]||[];}})();
+        var bi_up_data = {bi_up_json};
+        var bi_down_data = {bi_down_json};
+        var seg_up_data = {seg_up_json};
+        var seg_down_data = {seg_down_json};
+        var zs_markers = {zs_json};
 
-var chart = LightweightCharts.createChart(document.getElementById('chart'), {{
-    layout: {{
-        background: {{ type: 'solid', color: '#1e1e2e' }},
-        textColor: '#cdd6f4',
-        fontSize: 11,
-    }},
-    grid: {{
-        vertLines: {{ color: 'rgba(127,127,127,0.1)' }},
-        horzLines: {{ color: 'rgba(127,127,127,0.1)' }},
-    }},
-    crosshair: {{
-        mode: LightweightCharts.CrosshairMode.Normal,
-        vertLine: {{
-            color: '#FFD54F', width: 1, style: 0,
-            labelBackgroundColor: '#FF9800',
-        }},
-        horzLine: {{
-            color: '#FFD54F', width: 1, style: 0,
-            labelBackgroundColor: '#2196F3',
-        }},
-    }},
-    rightPriceScale: {{
-        borderColor: 'rgba(127,127,127,0.3)',
-        scaleMargins: {{ top: 0.05, bottom: 0.25 }},
-    }},
-    timeScale: {{
-        borderColor: 'rgba(127,127,127,0.3)',
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-    }},
-    width: 600,
-    height: {height},
-}});
+        var chart = LightweightCharts.createChart(document.getElementById('chart'), {{
+            layout: {{
+                background: {{ type: 'solid', color: '#1e1e2e' }},
+                textColor: '#cdd6f4',
+                fontSize: 11,
+            }},
+            grid: {{
+                vertLines: {{ color: 'rgba(127,127,127,0.1)' }},
+                horzLines: {{ color: 'rgba(127,127,127,0.1)' }},
+            }},
+            crosshair: {{
+                mode: LightweightCharts.CrosshairMode.Normal,
+                vertLine: {{
+                    color: '#FFD54F', width: 1, style: 0,
+                    labelBackgroundColor: '#FF9800',
+                }},
+                horzLine: {{
+                    color: '#FFD54F', width: 1, style: 0,
+                    labelBackgroundColor: '#2196F3',
+                }},
+            }},
+            rightPriceScale: {{
+                borderColor: 'rgba(127,127,127,0.3)',
+                scaleMargins: {{ top: 0.05, bottom: 0.25 }},
+            }},
+            timeScale: {{
+                borderColor: 'rgba(127,127,127,0.3)',
+                timeVisible: true,
+                secondsVisible: false,
+                rightOffset: 5,
+            }},
+            width: 600,
+            height: {height},
+        }});
 
 // K 线主图
 var candleSeries = chart.addCandlestickSeries({{
@@ -513,6 +515,21 @@ fsBtn.style.cssText = 'position:fixed;top:8px;right:12px;z-index:999;background:
 fsBtn.title = '全屏 / 退出全屏';
 fsBtn.onclick = toggleFullscreen;
 document.body.appendChild(fsBtn);
+    }};  // end dataVars
+
+    // 动态加载 lightweight-charts，加载完成后执行 dataVars
+    if (typeof LightweightCharts !== 'undefined') {{
+        dataVars();
+    }} else {{
+        var s = document.createElement('script');
+        s.src = '{_LWC_JS}';
+        s.onload = dataVars;
+        s.onerror = function() {{
+            document.getElementById('title').innerHTML += ' <span style="color:#e74c3c">图表库加载失败</span>';
+        }};
+        document.head.appendChild(s);
+    }}
+}})();
 </script>
 </body>
 </html>"""

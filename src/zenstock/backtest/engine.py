@@ -110,6 +110,8 @@ class Backtest:
 
         equity_records: list[dict] = []
         prev_close = self.data["close"].iloc[0]
+        # T+1：记录买入所在交易日，次日（即不同交易日）才解锁可卖
+        prev_trade_date = self._trade_date(self.data["date"].iloc[0])
 
         for i in range(len(self.data)):
             row = self.data.iloc[i]
@@ -117,8 +119,11 @@ class Backtest:
             close = float(row["close"])
             pct = float(row.get("pct_change", 0.0) or 0.0)
 
-            # 每天开盘清零 available（T+1 规则核心）
-            self.position.available = self.position.shares
+            # T+1 规则：只在换日时才把持仓解锁为可卖
+            cur_trade_date = self._trade_date(date)
+            if cur_trade_date != prev_trade_date:
+                self.position.available = self.position.shares
+                prev_trade_date = cur_trade_date
 
             # 产生信号
             signal = self.strategy.on_bar(i, self.data)
@@ -246,6 +251,11 @@ class Backtest:
         if is_buy:
             return price * (1 + self.cfg.slippage)
         return price * (1 - self.cfg.slippage)
+
+    @staticmethod
+    def _trade_date(date: pd.Timestamp) -> pd.Timestamp:
+        """从 datetime 中提取交易日（仅日期部分），用于 T+1 判断。"""
+        return pd.Timestamp(date).normalize()
 
 
 # ============================================================

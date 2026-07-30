@@ -346,13 +346,13 @@ class _SimpleZS:
 
 def _is_up_bi(bi: Any) -> bool:
     """判断笔方向是否向上。"""
-    direction = str(getattr(bi, "direction", ""))
-    return "up" in direction.lower() or "上" in direction
+    from zenstock.chanlun.bi_state import czsc_direction_is_up
+    return czsc_direction_is_up(getattr(bi, "direction", ""))
 
 
 def _is_down_bi(bi: Any) -> bool:
-    direction = str(getattr(bi, "direction", ""))
-    return "down" in direction.lower() or "下" in direction
+    from zenstock.chanlun.bi_state import czsc_direction_is_up
+    return not czsc_direction_is_up(getattr(bi, "direction", ""))
 
 
 def _bi_high(bi: Any) -> float:

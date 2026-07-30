@@ -66,6 +66,11 @@ class DataStorage:
         else:  # merge
             if path.exists():
                 old = pd.read_parquet(path)
+                # 过滤掉 OHLC 全为 NaN 的无效行（盘中不完整数据）
+                ohlc_cols = [c for c in ["open", "high", "low", "close"] if c in df.columns]
+                df = df.dropna(subset=ohlc_cols, how="all")
+                if old is not None and not old.empty:
+                    old = old.dropna(subset=ohlc_cols, how="all")
                 new_df = pd.concat([old, df], ignore_index=True)
                 new_df = new_df.drop_duplicates(subset=["date", "symbol"], keep="last")
                 new_df = new_df.sort_values("date").reset_index(drop=True)
@@ -100,18 +105,31 @@ class DataStorage:
             df = df[df["date"] >= start_date]
         if end_date:
             df = df[df["date"] <= end_date]
-        return df.reset_index(drop=True)
+        df = df.reset_index(drop=True)
+        # Parquet 不保留业务频率；补回元数据，供缠论策略选择正确的
+        # CZSC 周期和概率矩阵级别（尤其是 5 分钟数据）。
+        df.attrs["freq"] = freq.value
+        return df
 
     def get_last_date(self, symbol: str, freq: Freq | str = Freq.DAILY) -> str | None:
         """获取某股票已存储的最新日期（用于增量更新）。
 
         日线返回 "YYYY-MM-DD"，分钟线返回完整时间戳。
+        自动跳过 OHLC 全为 NaN 的无效行。
         """
         df = self.read_klines(symbol, freq)
         if df.empty:
             return None
         freq_enum = Freq(freq) if isinstance(freq, str) else freq
-        last = df["date"].max()
+        # 过滤掉 OHLC 全为 NaN 的无效行（盘中不完整数据）
+        ohlc_cols = [c for c in ["open", "high", "low", "close"] if c in df.columns]
+        if ohlc_cols:
+            valid = df.dropna(subset=ohlc_cols, how="all")
+            if valid.empty:
+                return None
+            last = valid["date"].max()
+        else:
+            last = df["date"].max()
         if freq_enum.is_minute:
             return str(last)  # 完整时间戳
         return str(last.date())
