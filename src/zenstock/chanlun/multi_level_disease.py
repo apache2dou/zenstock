@@ -106,7 +106,18 @@ def compute_multilevel_states(
 
 
 def _compute_single_level_state(df: pd.DataFrame, freq) -> BiState | None:
-    """计算单个级别的当前笔状态。"""
+    """计算单个级别的当前笔状态（增量 CZSC，避免笔确认滞后）。
+
+    关键修复（2026-07-31）：
+    旧版用 ``CZSC(bars)`` 一次性构建全部历史，``bi_list[-1]`` 是**已确认**
+    的最后一笔。当新笔正在形成时，已确认笔必然是反向的，导致状态永远
+    返回 ``DOWN_FX_FORMING``（已验证 75/75 买入时刻均如此）。
+
+    修复：逐根 K 线增量更新 CZSC，与训练器
+    ``compute_level_states`` 使用完全一致的因果逻辑。
+    ``bi_list[-1]`` 现在是当前形成笔之前的最后一笔，方向正确；
+    ``ubi_fxs`` 包含当前形成中的分型候选。
+    """
     from czsc import CZSC  # type: ignore
     from zenstock.chanlun.adapter import df_to_bars
 
@@ -114,7 +125,18 @@ def _compute_single_level_state(df: pd.DataFrame, freq) -> BiState | None:
     if len(bars) < 10:
         return None
 
-    czsc_obj = CZSC(bars)
+    czsc_obj = None
+    for bar in bars:
+        try:
+            if czsc_obj is None:
+                czsc_obj = CZSC([bar], max_bi_num=len(bars))
+            else:
+                czsc_obj.update(bar)
+        except Exception:
+            continue
+    if czsc_obj is None:
+        return None
+
     bi_list = list(czsc_obj.bi_list)
 
     if not bi_list:

@@ -888,6 +888,9 @@ class BiStateStrategy(BaseStrategy):
         self._multilevel_initialized: bool = False
         self._last_multilevel_check: int = -999
         self._current_disease: Any = None  # DiseaseMatrix 快照
+        # 持久化增量 CZSC 对象（每级别一个），避免每次多级别更新都从头重建
+        self._level_czsc: dict[str, Any] = {}          # {级别名: CZSC 对象}
+        self._level_bars_seen: dict[str, int] = {}      # {级别名: 已处理的 bar 数}
         # 概率矩阵：优先加载预计算文件，否则在线训练
         self._fx_count: int = 0  # 当前分型出现次数（文档 §4.6 第五维度）
         self._fx_count_dir: int = 0  # 上一次分型的方向（1=up, -1=down）
@@ -1167,6 +1170,10 @@ class BiStateStrategy(BaseStrategy):
         """计算当前时刻的多级别病情矩阵（文档 §4）。
 
         每隔 multilevel_interval 根 K 线重新计算一次。
+
+        性能优化（2026-07-31）：
+        维护持久化增量 CZSC 对象，每次只 update 新 bar，而非从头重建。
+        这将复杂度从 O(N²) 降为 O(N)。
         """
         if not self.p.use_multilevel:
             return
@@ -1176,22 +1183,17 @@ class BiStateStrategy(BaseStrategy):
 
         try:
             from zenstock.chanlun.multi_level_disease import (
-                compute_multilevel_states,
                 diagnose_disease_matrix,
                 resample_for_multilevel,
             )
 
-            # 截止到当前 bar 的数据
+            # 截止到当前 bar 的数据，重采样出各级别
             current_df = df.iloc[: i + 1]
             source_freq = self._infer_freq(df)
             level_dfs = resample_for_multilevel(current_df, source_freq)
 
-            states = compute_multilevel_states(
-                df_5min=level_dfs.get("5分钟"),
-                df_30min=level_dfs.get("30分钟"),
-                df_daily=level_dfs.get("日线"),
-                df_weekly=level_dfs.get("周线"),
-            )
+            # 增量更新各级别 CZSC，计算当前笔状态
+            states = self._compute_multilevel_states_incremental(level_dfs, source_freq)
 
             if len(states) >= 2:
                 self._current_disease = diagnose_disease_matrix(states)
@@ -1199,6 +1201,86 @@ class BiStateStrategy(BaseStrategy):
                 self._current_disease = None
         except Exception:
             pass
+
+    def _compute_multilevel_states_incremental(
+        self,
+        level_dfs: dict[str, pd.DataFrame],
+        source_freq: str,
+    ) -> dict[str, Any]:
+        """增量更新各级别 CZSC，返回当前笔状态字典。
+
+        性能关键：维护持久化 CZSC 对象，每次只 update 新增的 bar，
+        而非从头重建。复杂度 O(N) 而非 O(N²)。
+
+        状态提取逻辑与训练器 ``compute_level_states`` 和
+        ``multi_level_disease._compute_single_level_state`` 完全一致：
+        bi_list[-1].direction + ubi_fxs[-1].mark。
+        """
+        from czsc import CZSC
+        from zenstock.chanlun.adapter import df_to_bars
+        from zenstock.data.types import Freq
+        from zenstock.chanlun.bi_state import (
+            compute_bi_state, czsc_direction_is_up,
+            czsc_mark_is_top, czsc_mark_is_bottom,
+        )
+
+        level_freq_map = {
+            "5分钟": ("5", Freq.MIN5),
+            "30分钟": ("30", Freq.MIN30),
+            "日线": ("D", Freq.DAILY),
+            "周线": ("W", Freq.WEEKLY),
+        }
+
+        states: dict[str, Any] = {}
+        for level_name, (freq_str, freq_enum) in level_freq_map.items():
+            ldf = level_dfs.get(level_name)
+            if ldf is None or ldf.empty or len(ldf) < 10:
+                continue
+            try:
+                bars = df_to_bars(ldf, freq_str)
+                if len(bars) < 10:
+                    continue
+
+                seen = self._level_bars_seen.get(level_name, 0)
+                obj = self._level_czsc.get(level_name)
+
+                if obj is None:
+                    # 首次初始化（或数据被截断导致重建）
+                    obj = CZSC(bars, max_bi_num=len(bars))
+                    seen = len(bars)
+                else:
+                    # 增量更新：只 feed 新增的 bar
+                    if len(bars) < seen:
+                        # 数据回退（不应发生），重建
+                        obj = CZSC(bars, max_bi_num=len(bars))
+                        seen = len(bars)
+                    else:
+                        for bar in bars[seen:]:
+                            try:
+                                obj.update(bar)
+                            except Exception:
+                                continue
+                        seen = len(bars)
+
+                self._level_czsc[level_name] = obj
+                self._level_bars_seen[level_name] = seen
+
+                # 提取状态（与训练器一致的因果逻辑）
+                bi_list = list(obj.bi_list)
+                if not bi_list:
+                    continue
+                last_bi = bi_list[-1]
+                is_up = czsc_direction_is_up(getattr(last_bi, "direction", None))
+                fx_forming = False
+                ubi_fxs = list(getattr(obj, "ubi_fxs", []))
+                if ubi_fxs:
+                    mark = getattr(ubi_fxs[-1], "mark", "")
+                    if (is_up and czsc_mark_is_top(mark)) or (not is_up and czsc_mark_is_bottom(mark)):
+                        fx_forming = True
+                states[level_name] = compute_bi_state("up" if is_up else "down", fx_forming)
+            except Exception:
+                continue
+        return states
 
     def _determine_trend(self, i: int, df: pd.DataFrame) -> str:
         """用 MA60 判断大趋势（文档 §7.1）。"""
